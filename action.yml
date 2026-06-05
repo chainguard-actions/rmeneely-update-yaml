@@ -1,0 +1,42 @@
+name: 'Update YAML'
+author: Rick Meneely <rick@meneely.com>
+branding:
+  icon: edit
+  color: purple
+description: Update YAML file values
+inputs:
+  infile:
+    description: The YAML file to be updated
+    default: 'values.yaml'
+    required: false
+  varlist:
+    description: Comma separated list of var=value
+    default: ''
+    required: false
+outputs:
+  updated:
+    description: 'Set to true or false based on if the infile was modified'
+    value: ${{ steps.update-yaml.outputs.updated }}
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/setup-python@7f4fc3e22c37d6ff65e88745f38bd3157c663f7c # v4
+      with:
+        python-version: '3.9'
+    - env:
+        ACTION_PATH: ${{ github.action_path }}
+        INFILE: ${{ inputs.infile }}
+        VARLIST: ${{ inputs.varlist }}
+      run: |
+        python "$ACTION_PATH/update-yaml.py" -i "$INFILE" -V "$VARLIST" > "$ACTION_PATH/.update-yaml.tmp"
+      shell: bash
+    - env:
+        ACTION_PATH: ${{ github.action_path }}
+        INFILE: ${{ inputs.infile }}
+      run: >
+        updated=$((diff "$INFILE" "$ACTION_PATH/.update-yaml.tmp" || true) | wc -l | sed -e 's/ //g') ;
+        if [ $updated = 0 ]; then updated='false' ; else updated='true' ; fi ;
+        echo "updated=${updated}" >> $GITHUB_OUTPUT ;
+        mv "$ACTION_PATH/.update-yaml.tmp" "$INFILE"
+      shell: bash
+      id: update-yaml

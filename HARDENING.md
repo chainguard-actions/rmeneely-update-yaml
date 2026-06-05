@@ -14,16 +14,16 @@ Action **rmeneely--update-yaml/v1.0.3** was hardened automatically. 6 finding(s)
 
 ### script-injection (severity: high)
 
-Two run: steps in action.yml directly interpolate attacker-controlled expressions into shell commands without first assigning them to environment variables. In the first step (line 27), `${{ inputs.infile }}`, `${{ inputs.varlist }}`, and `${{ github.action_path }}` are embedded directly in the shell command string. In the second step (line 29), `${{ inputs.infile }}` and `${{ github.action_path }}` are again directly interpolated. An attacker who controls the `infile` or `varlist` inputs can inject arbitrary shell commands (e.g., by passing a value like `; malicious-command #`). These values must be assigned to environment variables via `env:` and referenced as `$ENV_VAR` in the run block.
+Two `run:` blocks in action.yml directly interpolate attacker-controlled expressions into shell commands without first assigning them to environment variables. `${{ inputs.infile }}` and `${{ inputs.varlist }}` are caller-supplied inputs that can contain shell metacharacters or newlines, enabling arbitrary command injection. Line 26: `python ${{ github.action_path }}/update-yaml.py -i ${{ inputs.infile }} -V "${{ inputs.varlist }}" > ...`. Line 28: `diff ${{ inputs.infile }} ${{ github.action_path }}/.update-yaml.tmp` and `mv ${{ github.action_path }}/.update-yaml.tmp ${{ inputs.infile }}`. These should be passed via `env:` variables and referenced as `$ENV_VAR` in the shell.
 
 Locations:
 
-- `action.yml:27`
-- `action.yml:29`
+- `action.yml:26`
+- `action.yml:28`
 
 ### unpinned-uses (severity: high)
 
-The action uses `actions/setup-python@v4` (line 23), which references a mutable tag (`@v4`) rather than a full 40-character commit SHA. A mutable tag can be silently moved to point to a different (potentially malicious) commit, enabling a supply-chain attack. It should be pinned to a specific SHA, e.g., `actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v4`.
+The composite action references `actions/setup-python@v4` using a mutable version tag (`@v4`) instead of a full 40-character commit SHA. This means the action could be silently updated to a different (potentially malicious) version without the workflow author's knowledge, creating a supply-chain risk. It should be pinned to a specific SHA, e.g. `actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v4`.
 
 Locations:
 
@@ -69,5 +69,7 @@ Locations:
 
 **Notes:**
 
-Fixed three categories of findings in action.yml: (1) Pinned actions/setup-python from mutable tag @v4 to full SHA @7f4fc3e22c37d6ff65e88745f38bd3157c663f7c # v4. (2) Moved all ${{ inputs.infile }}, ${{ inputs.varlist }}, and ${{ github.action_path }} expressions from both run: blocks into env: blocks (as INFILE, VARLIST, ACTION_PATH), referencing them as plain shell variables with proper quoting in the run scripts to prevent shell injection attacks.
+Fixed all findings in action.yml:
+1. Pinned `actions/setup-python@v4` to full SHA `7f4fc3e22c37d6ff65e88745f38bd3157c663f7c` with `# v4` comment.
+2. Moved all `${{ inputs.infile }}`, `${{ inputs.varlist }}`, and `${{ github.action_path }}` expressions out of both `run:` blocks into `env:` blocks (as INFILE, VARLIST, ACTION_PATH respectively). Shell scripts now reference these as plain environment variables ($INFILE, $VARLIST, $ACTION_PATH), eliminating all script injection vectors.
 

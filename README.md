@@ -8,6 +8,7 @@ Hardened by [Chainguard](https://www.chainguard.dev) from the upstream action at
 
 | Version | Tag | Upstream commit |
 |---------|-----|-----------------|
+| v1 | [`v1`](https://github.com/chainguard-actions/rmeneely-update-yaml/tree/v1) | [`63ac388`](https://github.com/rmeneely/update-yaml/commit/63ac3881d0e770818c21e7143fdb80785eeb0593) |
 | v1.0.3 | [`v1.0.3`](https://github.com/chainguard-actions/rmeneely-update-yaml/tree/v1.0.3) | [`2b1ef17`](https://github.com/rmeneely/update-yaml/commit/2b1ef17379d44261070e087aea7638ea6e64a1c2) |
 | v1.0.5 | [`v1.0.5`](https://github.com/chainguard-actions/rmeneely-update-yaml/tree/v1.0.5) | [`63ac388`](https://github.com/rmeneely/update-yaml/commit/63ac3881d0e770818c21e7143fdb80785eeb0593) |
 

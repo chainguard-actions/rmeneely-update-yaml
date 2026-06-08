@@ -1,15 +1,58 @@
-# rmeneely/update-yaml
+# update-yaml
+This GitHub Action updates YAML file values
 
-Update YAML file values
+## Usage
+```yaml
+    - uses: rmeneely/update-yaml@v1
+      with:
+        # Infile. The YAML file to be read and updated
+        # Default: 'values.yaml'
+        # Optional
+        infile: 'values.yaml
+        # varlist - a comma separated list of variable values. e.g version=v1.2.3,image.tag=latest
+        # Default: ''
+        # Optional
+        varlist: 'version=v1.2.3,image.tag=latest'
+```
 
-Hardened by [Chainguard](https://www.chainguard.dev) from the upstream action at [https://github.com/rmeneely/update-yaml](https://github.com/rmeneely/update-yaml).
+## Examples
+```yaml
+    # Sets image tag in values.yaml file
+    # Example: 
+    - uses: rmeneely/update-yaml@v1
+      with:
+        infile: values.yaml
+        varlist: 'image.tag=v1.2.3'
+```
 
-## Versions
+```yaml
+    # Sets appVersion and version in Chart.yaml
+    # Example: 
+    - uses: rmeneely/update-yaml@v1
+      with:
+        infile: values.yaml
+        varlist: appVersion=v1.2.3,version=4.5.6
+```
 
-| Version | Tag | Upstream commit |
-|---------|-----|-----------------|
-| v1.0.3 | [`v1.0.3`](https://github.com/chainguard-actions/rmeneely-update-yaml/tree/v1.0.3) | [`2b1ef17`](https://github.com/rmeneely/update-yaml/commit/2b1ef17379d44261070e087aea7638ea6e64a1c2) |
-| v1.0.5 | [`v1.0.5`](https://github.com/chainguard-actions/rmeneely-update-yaml/tree/v1.0.5) | [`63ac388`](https://github.com/rmeneely/update-yaml/commit/63ac3881d0e770818c21e7143fdb80785eeb0593) |
+```yaml
+    # Sets dependency version in Chart.yaml list of dependencies
+    # Example: 
+    - uses: rmeneely/update-yaml@v1
+      with:
+        infile: Chart.yaml
+        varlist: dependencies[name=myapp].version=\"1.0.1\"
+```
+
+This will update the `dependencies.version` value to "1.0.1" where that same list item has `dependencies.name` set to 'myapp'.
+
+
+## Output
+```shell
+steps.update-yaml.outputs.updated - Set to 'true' or 'false'
+```
+
+## License
+The MIT License (MIT)
 
 ## Privacy
 

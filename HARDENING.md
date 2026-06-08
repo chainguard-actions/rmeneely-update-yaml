@@ -14,26 +14,20 @@ Action **rmeneely--update-yaml/v1.0.5** was hardened automatically. 6 finding(s)
 
 ### script-injection (severity: high)
 
-Two `run:` blocks in action.yml directly interpolate attacker-controlled expressions inside shell command strings without first assigning them to environment variables.
-
-Step 1 (line ~22): `python ${{ github.action_path }}/update-yaml.py -i ${{ inputs.infile }} -V "${{ inputs.varlist }}" > ${{ github.action_path }}/.update-yaml.tmp` — `inputs.infile` and `inputs.varlist` are caller-supplied and interpolated directly into the shell command, enabling shell injection via crafted values (e.g. a varlist containing `; malicious-command`).
-
-Step 2 (line ~24): `diff ${{ inputs.infile }} ${{ github.action_path }}/.update-yaml.tmp` and `mv ${{ github.action_path }}/.update-yaml.tmp ${{ inputs.infile }}` — again `inputs.infile` is interpolated directly into the shell command.
-
-Fix: assign all expressions to `env:` variables and reference them as `$VAR` in the shell script.
+Both `run:` blocks in action.yml directly interpolate attacker-controlled expressions into shell command strings without first assigning them to environment variables. In the first run block (line 25), `${{ inputs.infile }}`, `${{ inputs.varlist }}`, and `${{ github.action_path }}` are interpolated directly into the shell command: `python ${{ github.action_path }}/update-yaml.py -i ${{ inputs.infile }} -V "${{ inputs.varlist }}" > ${{ github.action_path }}/.update-yaml.tmp`. In the second run block (line 27), `${{ inputs.infile }}` and `${{ github.action_path }}` are interpolated directly into: `diff ${{ inputs.infile }} ${{ github.action_path }}/.update-yaml.tmp` and `mv ${{ github.action_path }}/.update-yaml.tmp ${{ inputs.infile }}`. An attacker can supply a malicious value for `inputs.infile` or `inputs.varlist` (e.g., containing shell metacharacters) to execute arbitrary commands. These should be passed via `env:` variables instead.
 
 Locations:
 
-- `action.yml:22`
-- `action.yml:24`
+- `action.yml:25`
+- `action.yml:27`
 
 ### unpinned-uses (severity: high)
 
-The composite action uses `actions/setup-python@v4`, which references a mutable tag (`@v4`) rather than a pinned 40-character commit SHA. A tag can be moved to point to a different (potentially malicious) commit at any time, creating a supply-chain risk. It should be pinned to a full SHA, e.g. `actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v4`.
+The action references `actions/setup-python@v4` using a mutable version tag (`@v4`) instead of a pinned 40-character commit SHA. A mutable tag can be moved to point to a different (potentially malicious) commit, enabling supply-chain attacks. It should be pinned to a full SHA, e.g., `actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v4`.
 
 Locations:
 
-- `action.yml:21`
+- `action.yml:23`
 
 ### static-inline-injection (severity: high)
 
@@ -75,5 +69,5 @@ Locations:
 
 **Notes:**
 
-Fixed action.yml: (1) Pinned actions/setup-python@v4 to full SHA @7f4fc3e22c37d6ff65e88745f38bd3157c663f7c # v4. (2) In step 1 (python invocation), moved ${{ github.action_path }}, ${{ inputs.infile }}, and ${{ inputs.varlist }} to env: block as ACTION_PATH, INFILE, VARLIST and referenced them as $ACTION_PATH, $INFILE, $VARLIST in the shell script. (3) In step 2 (diff/mv), moved ${{ github.action_path }} and ${{ inputs.infile }} to env: block as ACTION_PATH and INFILE and referenced them as $ACTION_PATH and $INFILE in the shell script. All shell variables are quoted to prevent word-splitting issues.
+Fixed action.yml: (1) Pinned actions/setup-python@v4 to full SHA 7f4fc3e22c37d6ff65e88745f38bd3157c663f7c. (2) Moved all ${{ inputs.infile }}, ${{ inputs.varlist }}, and ${{ github.action_path }} expressions out of both run: blocks into env: blocks (as INFILE, VARLIST, ACTION_PATH), then referenced them as quoted shell variables to prevent script injection via shell metacharacters.
 

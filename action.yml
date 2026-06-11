@@ -24,15 +24,15 @@ runs:
       with:
         python-version: '3.9'
     - env:
+        ACTION_PATH: ${{ github.action_path }}
         INFILE: ${{ inputs.infile }}
         VARLIST: ${{ inputs.varlist }}
-        ACTION_PATH: ${{ github.action_path }}
       run: |
         python "$ACTION_PATH/update-yaml.py" -i "$INFILE" -V "$VARLIST" > "$ACTION_PATH/.update-yaml.tmp"
       shell: bash
     - env:
-        INFILE: ${{ inputs.infile }}
         ACTION_PATH: ${{ github.action_path }}
+        INFILE: ${{ inputs.infile }}
       run: >
         updated=$((diff "$INFILE" "$ACTION_PATH/.update-yaml.tmp" || true) | wc -l | sed -e 's/ //g') ;
         if [ $updated = 0 ]; then updated='false' ; else updated='true' ; fi ;

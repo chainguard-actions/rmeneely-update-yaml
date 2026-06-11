@@ -33,10 +33,10 @@ runs:
     - env:
         ACTION_PATH: ${{ github.action_path }}
         INFILE: ${{ inputs.infile }}
-      run: >
+      run: |
         updated=$((diff "$INFILE" "$ACTION_PATH/.update-yaml.tmp" || true) | wc -l | sed -e 's/ //g') ;
-        if [ $updated = 0 ]; then updated='false' ; else updated='true' ; fi ;
-        echo "::set-output name=updated::${updated}" ;
+        if [ "$updated" = 0 ]; then updated='false' ; else updated='true' ; fi ;
+        echo "updated=${updated}" >> "$GITHUB_OUTPUT" ;
         mv "$ACTION_PATH/.update-yaml.tmp" "$INFILE"
       shell: bash
       id: update-yaml

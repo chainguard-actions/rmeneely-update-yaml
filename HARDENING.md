@@ -1,8 +1,10 @@
+<!-- markdownlint-disable -->
+
 # Hardening Report: rmeneely--update-yaml/v1.0.5
 
 > This file was generated automatically by the hardening agent.
 
-**Policy SHA:** `ff50f15e4b79bfbf764dafdfd2579175a6ea9771`
+**Policy SHA:** `d636be7e43ef829af6e853da6b3c7566db9f72fe`
 
 **Test Policy SHA:** `843adf9e4b8f85d0c08b27b9d0b09dd094b54702`
 
@@ -12,22 +14,28 @@ Action **rmeneely--update-yaml/v1.0.5** was hardened automatically. 6 finding(s)
 
 ## Findings Fixed
 
-### script-injection (severity: high)
-
-Both `run:` blocks in action.yml directly interpolate attacker-controlled expressions into shell command strings without first assigning them to environment variables. In the first run block (line 25), `${{ inputs.infile }}`, `${{ inputs.varlist }}`, and `${{ github.action_path }}` are interpolated directly into the shell command: `python ${{ github.action_path }}/update-yaml.py -i ${{ inputs.infile }} -V "${{ inputs.varlist }}" > ${{ github.action_path }}/.update-yaml.tmp`. In the second run block (line 27), `${{ inputs.infile }}` and `${{ github.action_path }}` are interpolated directly into: `diff ${{ inputs.infile }} ${{ github.action_path }}/.update-yaml.tmp` and `mv ${{ github.action_path }}/.update-yaml.tmp ${{ inputs.infile }}`. An attacker can supply a malicious value for `inputs.infile` or `inputs.varlist` (e.g., containing shell metacharacters) to execute arbitrary commands. These should be passed via `env:` variables instead.
-
-Locations:
-
-- `action.yml:25`
-- `action.yml:27`
-
 ### unpinned-uses (severity: high)
 
-The action references `actions/setup-python@v4` using a mutable version tag (`@v4`) instead of a pinned 40-character commit SHA. A mutable tag can be moved to point to a different (potentially malicious) commit, enabling supply-chain attacks. It should be pinned to a full SHA, e.g., `actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v4`.
+The action uses `actions/setup-python@v4`, which is pinned to a mutable tag (`@v4`) rather than an immutable 40-character commit SHA. This means the dependency can be silently changed by the upstream repository, enabling supply-chain attacks.
 
 Locations:
 
 - `action.yml:23`
+
+### script-injection (severity: high)
+
+Two `run:` blocks directly interpolate `${{ ... }}` expressions inside shell command strings (sub-rule a). This allows script injection because the YAML template substitution happens before the shell parses the command, so an attacker-controlled value can inject arbitrary shell metacharacters.
+
+1. Line 26: `python ${{ github.action_path }}/update-yaml.py -i ${{ inputs.infile }} -V "${{ inputs.varlist }}" > ${{ github.action_path }}/.update-yaml.tmp` — `inputs.infile` and `inputs.varlist` are caller-controlled and interpolated directly into the shell command.
+
+2. Line 28: `updated=$((diff ${{ inputs.infile }} ${{ github.action_path }}/.update-yaml.tmp || true) | wc -l ...)` and `mv ${{ github.action_path }}/.update-yaml.tmp ${{ inputs.infile }}` — again `inputs.infile` is interpolated directly.
+
+Fix: move all `${{ inputs.* }}` values into `env:` variables and reference them as double-quoted shell variables (e.g., `"$INFILE"`, `"$VARLIST"`).
+
+Locations:
+
+- `action.yml:26`
+- `action.yml:28`
 
 ### static-inline-injection (severity: high)
 
@@ -69,5 +77,5 @@ Locations:
 
 **Notes:**
 
-Fixed action.yml: (1) Pinned actions/setup-python@v4 to full SHA 7f4fc3e22c37d6ff65e88745f38bd3157c663f7c. (2) Moved all ${{ inputs.infile }}, ${{ inputs.varlist }}, and ${{ github.action_path }} expressions out of both run: blocks into env: blocks (as INFILE, VARLIST, ACTION_PATH), then referenced them as quoted shell variables to prevent script injection via shell metacharacters.
+Fixed action.yml: (1) Pinned actions/setup-python@v4 to full commit SHA 7f4fc3e22c37d6ff65e88745f38bd3157c663f7c with # v4 comment. (2) Moved all ${{ inputs.infile }}, ${{ inputs.varlist }}, and ${{ github.action_path }} expressions from both run: blocks into env: blocks (ACTION_PATH, INFILE, VARLIST), referencing them as double-quoted shell variables to prevent script injection.
 

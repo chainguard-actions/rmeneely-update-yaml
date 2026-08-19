@@ -1,0 +1,53 @@
+name: Test multiple YAML value updates
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create test YAML file
+        run: |
+          printf 'version: 1.0.0\nimage: myapp\nreplicas: 3\n' > /tmp/test-values.yaml
+          echo "Input file contents:"
+          cat /tmp/test-values.yaml
+
+      - id: action
+        uses: .
+        with:
+          infile: /tmp/test-values.yaml
+          varlist: "version=2.5.0,image=newapp,replicas=5"
+
+      - name: Assert updated output is true
+        env:
+          ACTUAL: ${{ steps.action.outputs.updated }}
+        run: |
+          echo "actual: $ACTUAL"
+          if [ "$ACTUAL" != "true" ]; then
+            echo "FAIL: expected 'true' but got '$ACTUAL'"
+            exit 1
+          fi
+          echo "PASS"
+
+      - name: Assert all values were updated
+        run: |
+          echo "Contents of updated file:"
+          cat /tmp/test-values.yaml
+          FAIL=0
+          if ! grep -q "version: 2.5.0" /tmp/test-values.yaml; then
+            echo "FAIL: version was not updated to 2.5.0"
+            FAIL=1
+          fi
+          if ! grep -q "image: newapp" /tmp/test-values.yaml; then
+            echo "FAIL: image was not updated to newapp"
+            FAIL=1
+          fi
+          if ! grep -q "replicas: 5" /tmp/test-values.yaml; then
+            echo "FAIL: replicas was not updated to 5"
+            FAIL=1
+          fi
+          if [ "$FAIL" = "1" ]; then
+            exit 1
+          fi
+          echo "PASS: all values updated correctly"

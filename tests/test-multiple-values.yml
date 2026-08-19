@@ -1,0 +1,57 @@
+name: Test updating multiple YAML values
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create test YAML file
+        run: |
+          cat > /tmp/test-multi.yaml << 'EOF'
+          image:
+            tag: v1.0.0
+          replicas: 1
+          service:
+            port: 8080
+          EOF
+
+      - id: action
+        uses: .
+        with:
+          infile: /tmp/test-multi.yaml
+          varlist: "image.tag=v2.0.0,replicas=5,service.port=9090"
+
+      - name: Assert updated output is true
+        env:
+          ACTUAL: ${{ steps.action.outputs.updated }}
+        run: |
+          echo "actual: $ACTUAL"
+          if [ "$ACTUAL" != "true" ]; then
+            echo "FAIL: expected 'true' but got '$ACTUAL'"
+            exit 1
+          fi
+          echo "PASS"
+
+      - name: Assert all values were updated
+        run: |
+          echo "File contents:"
+          cat /tmp/test-multi.yaml
+          FAIL=0
+          if ! grep -q "tag: v2.0.0" /tmp/test-multi.yaml; then
+            echo "FAIL: expected 'tag: v2.0.0' in file"
+            FAIL=1
+          fi
+          if ! grep -q "replicas: 5" /tmp/test-multi.yaml; then
+            echo "FAIL: expected 'replicas: 5' in file"
+            FAIL=1
+          fi
+          if ! grep -q "port: 9090" /tmp/test-multi.yaml; then
+            echo "FAIL: expected 'port: 9090' in file"
+            FAIL=1
+          fi
+          if [ "$FAIL" = "1" ]; then
+            exit 1
+          fi
+          echo "PASS"

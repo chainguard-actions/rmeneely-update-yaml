@@ -1,0 +1,47 @@
+name: Test nested YAML key update
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create test YAML file with nested keys
+        run: |
+          cat > /tmp/test-nested.yaml << 'EOF'
+          app:
+            name: myapp
+            image:
+              repository: myrepo/myapp
+              tag: old-tag
+            resources:
+              cpu: 100m
+          EOF
+
+      - id: action
+        uses: .
+        with:
+          infile: /tmp/test-nested.yaml
+          varlist: "app.image.tag=new-tag"
+
+      - name: Assert updated output is true
+        env:
+          ACTUAL: ${{ steps.action.outputs.updated }}
+        run: |
+          echo "actual: $ACTUAL"
+          if [ "$ACTUAL" != "true" ]; then
+            echo "FAIL: expected 'true' but got '$ACTUAL'"
+            exit 1
+          fi
+          echo "PASS"
+
+      - name: Assert nested key was updated
+        run: |
+          echo "=== Updated file contents ==="
+          cat /tmp/test-nested.yaml
+          if ! grep -q "tag: new-tag" /tmp/test-nested.yaml; then
+            echo "FAIL: expected 'tag: new-tag' in file"
+            exit 1
+          fi
+          echo "PASS"

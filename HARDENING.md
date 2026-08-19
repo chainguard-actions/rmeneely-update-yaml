@@ -8,7 +8,7 @@
 
 **Test Policy SHA:** `843adf9e4b8f85d0c08b27b9d0b09dd094b54702`
 
-**Harden Agent Version:** `1`
+**Harden Agent Version:** `2`
 
 Action **rmeneely--update-yaml/v1.0.3** was hardened automatically. 6 finding(s) were identified and resolved across 1 iteration(s).
 
@@ -16,28 +16,26 @@ Action **rmeneely--update-yaml/v1.0.3** was hardened automatically. 6 finding(s)
 
 ### unpinned-uses (severity: high)
 
-The action uses `actions/setup-python@v4`, which is pinned to a mutable tag rather than an immutable 40-character commit SHA. This means the referenced action could be silently changed by the upstream maintainer, enabling supply-chain attacks.
+The action uses `actions/setup-python@v4`, which is pinned to a mutable tag (`v4`) rather than an immutable 40-character commit SHA. A tag can be moved to point to a different (potentially malicious) commit at any time, enabling a supply-chain attack. It should be pinned to a full SHA, e.g. `actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v4`.
 
 Locations:
 
-- `action.yml:23`
+- `action.yml:22`
 
 ### script-injection (severity: high)
 
-Rule (a) violation: Multiple `${{ ... }}` expressions are interpolated directly inside `run:` shell command strings without going through an env: variable or any quoting protection.
+Sub-rule (a): Two `run:` blocks directly interpolate GitHub Actions expressions inside shell command strings without routing them through env vars first.
 
-Step at line 26:
-  `python ${{ github.action_path }}/update-yaml.py -i ${{ inputs.infile }} -V "${{ inputs.varlist }}" > ${{ github.action_path }}/.update-yaml.tmp`
-  — `inputs.infile` and `inputs.varlist` are attacker-controlled inputs injected directly into the shell command. Even `github.action_path` flows through YAML template substitution before the shell sees it.
+**Step 1 (line 24):** `python ${{ github.action_path }}/update-yaml.py -i ${{ inputs.infile }} -V "${{ inputs.varlist }}" > ${{ github.action_path }}/.update-yaml.tmp` — `inputs.infile` and `inputs.varlist` are caller-controlled and are interpolated directly into the shell command. A value like `; malicious-command #` in `inputs.infile` would execute arbitrary shell code. `github.action_path` is also a context expression that passes through YAML template substitution before the shell processes it.
 
-Step at line 28:
-  `updated=$((diff ${{ inputs.infile }} ${{ github.action_path }}/.update-yaml.tmp || true) | wc -l ...) ; ... mv ${{ github.action_path }}/.update-yaml.tmp ${{ inputs.infile }}`
-  — Again, `inputs.infile` is directly interpolated, allowing an attacker to inject arbitrary shell commands via a crafted filename (e.g., `; malicious-command #`).
+**Step 2 (line 26):** `diff ${{ inputs.infile }} ${{ github.action_path }}/.update-yaml.tmp` and `mv ${{ github.action_path }}/.update-yaml.tmp ${{ inputs.infile }}` — same issue: `inputs.infile` is interpolated directly into the shell command string, allowing command injection.
+
+Fix: move all expressions into `env:` variables and reference them as double-quoted shell variables, e.g. `env:\n  INFILE: ${{ inputs.infile }}` and then use `"$INFILE"` in the run script.
 
 Locations:
 
+- `action.yml:24`
 - `action.yml:26`
-- `action.yml:28`
 
 ### static-inline-injection (severity: high)
 
@@ -79,7 +77,5 @@ Locations:
 
 **Notes:**
 
-1. Pinned `actions/setup-python@v4` to its immutable SHA `7f4fc3e22c37d6ff65e88745f38bd3157c663f7c` with a `# v4` comment for readability.
-2. Moved all `${{ github.action_path }}`, `${{ inputs.infile }}`, and `${{ inputs.varlist }}` expressions from both `run:` blocks into `env:` blocks (as ACTION_PATH, INFILE, VARLIST respectively), then referenced them as properly double-quoted shell variables to prevent script injection.
-3. Also replaced the deprecated `::set-output` workflow command with the modern `$GITHUB_OUTPUT` file approach.
+Fixed action.yml: (1) Pinned actions/setup-python@v4 to full SHA 7f4fc3e22c37d6ff65e88745f38bd3157c663f7c. (2) Moved all ${{ inputs.infile }}, ${{ inputs.varlist }}, and ${{ github.action_path }} expressions out of run: shell strings into env: blocks (INFILE, VARLIST, ACTION_PATH), then referenced them as double-quoted shell variables to prevent script/command injection.
 

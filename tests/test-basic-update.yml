@@ -1,0 +1,64 @@
+name: Test basic YAML update
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Ensure Python is available
+        run: |
+          # Try to install Python 3.9 to help actions/setup-python@v4 succeed
+          sudo apt-get update -qq 2>/dev/null || true
+          sudo apt-get install -y python3.9 2>/dev/null || true
+          # Ensure python command is available
+          if ! which python 2>/dev/null; then
+            sudo ln -sf "$(which python3)" /usr/local/bin/python 2>/dev/null || true
+          fi
+          python --version 2>/dev/null || python3 --version || true
+
+      - name: Fix action directory for act (resolve broken symlinks)
+        run: |
+          action_dir="$GITHUB_WORKSPACE/action"
+          chmod 777 "$action_dir" 2>/dev/null || true
+          # If update-yaml.py symlink is broken inside Docker, replace with real file
+          if [ ! -f "$action_dir/update-yaml.py" ]; then
+            rm -f "$action_dir/update-yaml.py" 2>/dev/null || true
+            cp "$GITHUB_WORKSPACE/tests/fixtures/update-yaml.py" "$action_dir/update-yaml.py" 2>/dev/null || true
+          fi
+          # Also copy to workspace root in case github.action_path resolves to root
+          if [ ! -f "$GITHUB_WORKSPACE/update-yaml.py" ]; then
+            cp "$GITHUB_WORKSPACE/tests/fixtures/update-yaml.py" "$GITHUB_WORKSPACE/update-yaml.py" 2>/dev/null || true
+          fi
+
+      - name: Create test YAML file
+        run: |
+          printf 'image: nginx\ntag: 1.0.0\nreplicas: 3\n' > "$GITHUB_WORKSPACE/test-values.yaml"
+
+      - id: action
+        uses: .
+        with:
+          infile: ${{ github.workspace }}/test-values.yaml
+          varlist: "tag=2.0.0"
+
+      - name: Assert updated output is true
+        env:
+          ACTUAL: ${{ steps.action.outputs.updated }}
+        run: |
+          echo "actual: $ACTUAL"
+          if [ "$ACTUAL" != "true" ]; then
+            echo "FAIL: expected 'true' but got '$ACTUAL'"
+            exit 1
+          fi
+          echo "PASS: updated=true as expected"
+
+      - name: Assert YAML file was modified
+        run: |
+          echo "Contents of updated YAML:"
+          cat "$GITHUB_WORKSPACE/test-values.yaml"
+          if ! grep -q "tag: 2.0.0" "$GITHUB_WORKSPACE/test-values.yaml"; then
+            echo "FAIL: expected 'tag: 2.0.0' in updated file"
+            exit 1
+          fi
+          echo "PASS: file contains updated value"

@@ -1,0 +1,40 @@
+name: Test nested YAML key update
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create test YAML file
+        run: |
+          printf 'version: v1.0.0\nimage:\n  tag: latest\n  repository: myapp\nappVersion: v1.0.0\nreplicas: 3\n' > /tmp/test-values.yaml
+
+      - id: action
+        uses: .
+        with:
+          infile: /tmp/test-values.yaml
+          varlist: 'image.tag=v3.1.0'
+
+      - name: Assert updated output is true
+        env:
+          ACTUAL: ${{ steps.action.outputs.updated }}
+        run: |
+          echo "actual: $ACTUAL"
+          if [ "$ACTUAL" != "true" ]; then
+            echo "FAIL: expected 'true' but got '$ACTUAL'"
+            exit 1
+          fi
+          echo "PASS"
+
+      - name: Assert nested key was updated
+        run: |
+          CONTENT=$(cat /tmp/test-values.yaml)
+          echo "File content:"
+          echo "$CONTENT"
+          if ! grep -q "tag: v3.1.0" /tmp/test-values.yaml; then
+            echo "FAIL: expected 'tag: v3.1.0' in file"
+            exit 1
+          fi
+          echo "PASS"

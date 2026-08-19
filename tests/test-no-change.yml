@@ -1,0 +1,44 @@
+name: Test YAML no change when value is same
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create test YAML file
+        run: |
+          cat > /tmp/test-nochange.yaml << 'EOF'
+          image:
+            tag: v1.0.0
+            repository: myapp
+          replicas: 3
+          EOF
+
+      - id: action
+        uses: .
+        with:
+          infile: /tmp/test-nochange.yaml
+          varlist: "image.tag=v1.0.0"
+
+      - name: Assert updated output is false
+        env:
+          ACTUAL: ${{ steps.action.outputs.updated }}
+        run: |
+          echo "actual: $ACTUAL"
+          if [ "$ACTUAL" != "false" ]; then
+            echo "FAIL: expected 'false' but got '$ACTUAL'"
+            exit 1
+          fi
+          echo "PASS"
+
+      - name: Assert file content is unchanged
+        run: |
+          echo "File contents:"
+          cat /tmp/test-nochange.yaml
+          if ! grep -q "tag: v1.0.0" /tmp/test-nochange.yaml; then
+            echo "FAIL: expected 'tag: v1.0.0' to remain in file"
+            exit 1
+          fi
+          echo "PASS: file value unchanged"

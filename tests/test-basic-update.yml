@@ -1,0 +1,43 @@
+name: Test basic YAML update
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create test YAML file
+        run: |
+          cat > /tmp/test-values.yaml << 'EOF'
+          image:
+            tag: v1.0.0
+          replicas: 3
+          EOF
+
+      - id: action
+        uses: .
+        with:
+          infile: /tmp/test-values.yaml
+          varlist: "image.tag=v2.0.0"
+
+      - name: Assert updated output is true
+        env:
+          ACTUAL: ${{ steps.action.outputs.updated }}
+        run: |
+          echo "actual: $ACTUAL"
+          if [ "$ACTUAL" != "true" ]; then
+            echo "FAIL: expected 'true' but got '$ACTUAL'"
+            exit 1
+          fi
+          echo "PASS"
+
+      - name: Assert file was actually updated
+        run: |
+          echo "File contents:"
+          cat /tmp/test-values.yaml
+          if ! grep -q "tag: v2.0.0" /tmp/test-values.yaml; then
+            echo "FAIL: expected 'tag: v2.0.0' in file"
+            exit 1
+          fi
+          echo "PASS: file contains updated value"

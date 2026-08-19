@@ -1,0 +1,33 @@
+name: Test no change when value already matches
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create test YAML file with existing value
+        run: |
+          cat > /tmp/test-nochange.yaml << 'EOF'
+          image:
+            tag: v1.0.0
+          replicas: 3
+          EOF
+
+      - id: action
+        uses: .
+        with:
+          infile: /tmp/test-nochange.yaml
+          varlist: "image.tag=v1.0.0"
+
+      - name: Assert updated output is false
+        env:
+          ACTUAL: ${{ steps.action.outputs.updated }}
+        run: |
+          echo "actual: $ACTUAL"
+          if [ "$ACTUAL" != "false" ]; then
+            echo "FAIL: expected 'false' but got '$ACTUAL'"
+            exit 1
+          fi
+          echo "PASS"
